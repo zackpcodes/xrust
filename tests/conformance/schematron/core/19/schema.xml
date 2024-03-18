@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><sch:schema xmlns:sch="http://purl.oclc.org/dsdl/schematron" xmlns="tag:dmaus@dmaus.name,2019:Schematron:Testsuite"><sch:let name="global-var" value="1"/><sch:pattern><sch:rule context="*"><sch:let name="rule-var" value="$global-var + 1"/><sch:assert test="$rule-var = 2"/></sch:rule></sch:pattern></sch:schema>
