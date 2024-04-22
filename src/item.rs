@@ -16,6 +16,7 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Formatter;
 use std::rc::Rc;
+use crate::trees::intmuttree::NodeBuilder;
 use crate::xmldecl::XMLDecl;
 
 /// In XPath, the Sequence is the fundamental data structure.
@@ -148,6 +149,7 @@ pub enum NodeType {
     Comment,
     ProcessingInstruction,
     Reference,
+    Namespace,
     #[default]
     Unknown,
 }
@@ -163,6 +165,7 @@ impl NodeType {
             NodeType::ProcessingInstruction => "Processing-Instruction",
             NodeType::Comment => "Comment",
             NodeType::Reference => "Reference",
+            NodeType::Namespace => "Namespace",
             NodeType::Unknown => "--None--",
         }
     }
@@ -453,6 +456,8 @@ pub trait Node: Clone {
     fn new_comment(&self, v: Rc<Value>) -> Result<Self, Error>;
     /// Create a new processing-instruction-type node in the same document tree. The new node is not attached to the tree.
     fn new_processing_instruction(&self, qn: QualifiedName, v: Rc<Value>) -> Result<Self, Error>;
+    /// Create a new namespace-type node in the same document tree. The new node is not attached to the tree.
+    fn new_namespace(&self, prefix: String, uri: String) -> Result<Self, Error>;
 
     /// Append a node to the child list
     fn push(&mut self, n: Self) -> Result<(), Error>;
@@ -462,6 +467,8 @@ pub trait Node: Clone {
     fn insert_before(&mut self, n: Self) -> Result<(), Error>;
     /// Set an attribute. self must be an element-type node. att must be an attribute-type node.
     fn add_attribute(&self, att: Self) -> Result<(), Error>;
+    /// Add a namespace node. self must be an element-type node. ns must be a namespace node.
+    fn add_namespace(&self, ns: Self) -> Result<(), Error>;
 
     /// Shallow copy the node, i.e. copy only the node, but not it's attributes or content.
     fn shallow_copy(&self) -> Result<Self, Error>;

@@ -281,6 +281,11 @@ pub struct Node {
     // name is mutable only so that the namespace URI can be set once the document is parsed.
     // If we can build a better parser then the RefCell can be removed.
     name: RefCell<Option<QualifiedName>>,
+    //Namespace Nodes
+    namespaces: RefCell<Vec<RNode>>,
+    ns_prefix: Option<String>,
+    ns_uri: Option<String>,
+
     value: Option<Rc<Value>>,
     pi_name: Option<String>,
     dtd: Option<DTD>,
@@ -453,6 +458,12 @@ impl ItemNode for RNode {
             .value(v)
             .build())
     }
+    fn new_namespace(&self, prefix: String, uri: String) -> Result<Self, Error>{
+        Ok(NodeBuilder::new(NodeType::Namespace)
+            .ns_prefix(prefix)
+            .ns_uri(uri)
+            .build())
+    }
 
     /// Append a node to the child list
     fn push(&mut self, n: RNode) -> Result<(), Error> {
@@ -492,6 +503,24 @@ impl ItemNode for RNode {
         }
         self.attributes.borrow_mut().insert(att.name(), att.clone());
         *att.parent.borrow_mut() = Some(Rc::downgrade(self));
+        Ok(())
+    }
+    /// Add a namespace to this element-type node.
+    /// NOTE: Does NOT assign a namespace to the element.
+    fn add_namespace(&self, ns: Self) -> Result<(), Error> {
+        if self.node_type() != NodeType::Element{
+            return Result::Err(Error::new(
+                ErrorKind::Unknown,
+                String::from("namespace must be added to an element node"),
+            ));
+        }
+        if ns.node_type() != NodeType::Namespace {
+            return Result::Err(Error::new(
+                ErrorKind::Unknown,
+                String::from("must be an namespace node"),
+            ));
+        }
+        self.namespaces.borrow_mut().insert(0, ns);
         Ok(())
     }
     /// Insert a node into the child list immediately before this node.
@@ -984,6 +1013,18 @@ impl NodeBuilder {
     }
     pub fn value(mut self, v: Rc<Value>) -> Self {
         self.0.value = Some(v);
+        self
+    }
+    pub fn ns_prefix(mut self, prefix: String) -> Self {
+        if prefix.is_empty(){
+            self.0.ns_prefix = None
+        } else {
+            self.0.ns_prefix = Some(prefix);
+        }
+        self
+    }
+    pub fn ns_uri(mut self, uri: String) -> Self {
+        self.0.ns_uri = Some(uri);
         self
     }
     pub fn pi_name(mut self, pi: String) -> Self {

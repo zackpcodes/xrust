@@ -29,6 +29,7 @@ fn childDeriv(pat: Pattern, cn: RNode) -> Pattern {
         NodeType::ProcessingInstruction => {Pattern::NotAllowed}
         NodeType::Reference => {Pattern::NotAllowed}
         NodeType::Unknown => {Pattern::NotAllowed}
+        NodeType::Namespace => {Pattern::NotAllowed}
         //NodeType::Text => {Pattern::NotAllowed}
         NodeType::Text => { textDeriv(pat, cn.value().to_string()) }
         //NodeType::Element => {Pattern::NotAllowed}

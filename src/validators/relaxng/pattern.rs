@@ -106,6 +106,9 @@ pub(crate) fn patternmaker(n: RNode) -> Result<Pattern, PatternError<'static>>{
         NodeType::Unknown => {
             Err(PatternError::Other("not yet implemented"))
         }
+        NodeType::Namespace => {
+            Err(PatternError::Other("not yet implemented"))
+        }
     }
     //;
     //Ok((Pattern::Empty))

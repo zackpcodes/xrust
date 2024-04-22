@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 use crate::item::{Node, NodeType};
 use crate::parser::combinators::alt::{alt2, alt4};
@@ -37,11 +38,12 @@ fn emptyelem<N: Node>() -> impl Fn(ParseInput<N>) -> Result<(ParseInput<N>, N), 
         {
             Ok(((input1, mut state1), (_, n, av, _, _))) => {
                 let mut ens = n.get_nsuri();
-                match state1.namespace.pop() {
+                let namespaces = state1.namespace.pop();
+                match namespaces {
                     None => {
                         //No namespace to assign.
                     }
-                    Some(ns) => {
+                    Some(ref ns) => {
                         let ns_to_check = n.get_prefix().unwrap_or_else(|| "xmlns".to_string());
                         if ns_to_check == *"xml" {
                             ens = Some("http://www.w3.org/XML/1998/namespace".to_string())
@@ -71,6 +73,37 @@ fn emptyelem<N: Node>() -> impl Fn(ParseInput<N>) -> Result<(ParseInput<N>, N), 
                     .expect("unable to create element");
                 av.iter()
                     .for_each(|b| e.add_attribute(b.clone()).expect("unable to add attribute"));
+                //Add namespace nodes
+                match namespaces {
+                    None => {
+                        //No namespace to assign, we only assign the XML prefix.
+                        e.add_namespace(
+                            e.new_namespace(
+                                "xml".to_string(),
+                                "http://www.w3.org/XML/1998/namespace".to_string()
+                            ).unwrap()
+                        ).expect("unable to add namespace node");
+                    }
+                    Some(ns) => {
+                        ns.iter().for_each(|(p, u)| {
+                            e.add_namespace(
+                                e.new_namespace(
+                                    p.to_string(),
+                                    u.to_string()
+                                ).unwrap()
+                            ).expect("unable to add namespace node");
+                        });
+                        //Check if XML NS was added, add if not.
+                        if ns.get("xml").is_none() {
+                            e.add_namespace(
+                                e.new_namespace(
+                                    "xml".to_string(),
+                                    "http://www.w3.org/XML/1998/namespace".to_string()
+                                ).unwrap()
+                            ).expect("unable to add namespace node");
+                        }
+                    }
+                }
                 Ok(((input1, state1.clone()), e))
             }
             Err(err) => Err(err),

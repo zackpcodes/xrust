@@ -61,11 +61,13 @@ enum NodeInner {
         Rc<QualifiedName>, // name
         RefCell<HashMap<Rc<QualifiedName>, RNode>>, // attributes
         RefCell<Vec<RNode>>, // children
+        RefCell<Vec<RNode>> // namespaces
     ),
     Text(RefCell<Weak<Node>>, Rc<Value>),
     Attribute(RefCell<Weak<Node>>, Rc<QualifiedName>, Rc<Value>),
     Comment(RefCell<Weak<Node>>, Rc<Value>),
     ProcessingInstruction(RefCell<Weak<Node>>, Rc<QualifiedName>, Rc<Value>),
+    Namespace(RefCell<Weak<Node>>, Rc<QualifiedName>)
 }
 pub struct Node(NodeInner);
 
@@ -76,12 +78,13 @@ impl Node {
     }
     pub fn set_nsuri(&mut self, uri: String) -> Result<(), Error>{
         match &self.0 {
-            NodeInner::Element(p, qn, att, c) => {
+            NodeInner::Element(p, qn, att, c, ns) => {
                 self.0 = NodeInner::Element(
                     p.clone(),
                     Rc::new(QualifiedName::new(Some(uri), qn.get_prefix(), qn.get_localname())),
                     att.clone(),
-                    c.clone()
+                    c.clone(),
+                    ns.clone()
                 );
                 Ok(())
             }
@@ -97,16 +100,17 @@ impl ItemNode for RNode {
     fn node_type(&self) -> NodeType {
         match &self.0 {
             NodeInner::Document(_, _, _) => NodeType::Document,
-            NodeInner::Element(_, _, _, _) => NodeType::Element,
+            NodeInner::Element(_, _, _, _, _) => NodeType::Element,
             NodeInner::Attribute(_, _, _) => NodeType::Attribute,
             NodeInner::Text(_, _) => NodeType::Text,
             NodeInner::Comment(_, _) => NodeType::Comment,
             NodeInner::ProcessingInstruction(_, _, _) => NodeType::ProcessingInstruction,
+            NodeInner::Namespace(_, _) => NodeType::Namespace,
         }
     }
     fn name(&self) -> QualifiedName {
         match &self.0 {
-            NodeInner::Element(_, qn, _, _) |
+            NodeInner::Element(_, qn, _, _, _) |
             NodeInner::ProcessingInstruction(_, qn, _) |
             NodeInner::Attribute(_, qn, _) => {
                 let r: QualifiedName = (*qn.clone()).clone();
@@ -132,12 +136,13 @@ impl ItemNode for RNode {
     fn to_string(&self) -> String {
         match &self.0 {
             NodeInner::Document(_, c, _) |
-            NodeInner::Element(_, _, _, c) => c.borrow().iter()
+            NodeInner::Element(_, _, _, c, _) => c.borrow().iter()
                 .fold(String::new(), |mut acc, n| {acc.push_str(n.to_string().as_str()); acc}),
             NodeInner::Attribute(_, _, v) |
             NodeInner::Text(_, v) |
             NodeInner::Comment(_, v) |
             NodeInner::ProcessingInstruction(_, _, v) => v.to_string(),
+            NodeInner::Namespace(_,q) => q.to_string()
         }
     }
     fn to_xml(&self) -> String {
@@ -203,13 +208,13 @@ impl ItemNode for RNode {
     }
     fn get_attribute(&self, a: &QualifiedName) -> Rc<Value> {
         match &self.0 {
-            NodeInner::Element(_, _, att, _) => att.borrow().get(a)
+            NodeInner::Element(_, _, att, _, _) => att.borrow().get(a)
                 .map_or(Rc::new(Value::from(String::new())), |v| v.value()),
             _ => Rc::new(Value::from(String::new()))
         }
     }
     fn new_element(&self, qn: QualifiedName) -> Result<Self, Error> {
-        let child = Rc::new(Node ( NodeInner::Element (RefCell::new(Rc::downgrade(&self.owner_document())), Rc::new(qn), RefCell::new(HashMap::new()), RefCell::new(vec![]))));
+        let child = Rc::new(Node ( NodeInner::Element (RefCell::new(Rc::downgrade(&self.owner_document())), Rc::new(qn), RefCell::new(HashMap::new()), RefCell::new(vec![]), RefCell::new(vec![]))));
         unattached(self, child.clone());
         Ok(child)
     }
@@ -230,6 +235,14 @@ impl ItemNode for RNode {
     }
     fn new_processing_instruction(&self, qn: QualifiedName, v: Rc<Value>) -> Result<Self, Error> {
         let child = Rc::new(Node ( NodeInner::ProcessingInstruction (RefCell::new(Rc::downgrade(&self.owner_document())), Rc::new(qn.clone()), v)));
+        unattached(self, child.clone());
+        Ok(child)
+    }
+    fn new_namespace(&self, prefix: String, uri: String) -> Result<Self, Error>{
+        let child = Rc::new(Node (
+            NodeInner::Namespace (RefCell::new(Rc::downgrade(&self.owner_document())),
+            Rc::new(QualifiedName::new(Some(uri), Some(prefix), "".to_string()))
+        )));
         unattached(self, child.clone());
         Ok(child)
     }
@@ -256,7 +269,7 @@ impl ItemNode for RNode {
                 match Weak::upgrade(&parent.borrow()) {
                     Some(p) => {
                         match &p.0 {
-                            NodeInner::Element(_, _, att, _) => {
+                            NodeInner::Element(_, _, att, _,_) => {
                                 att.borrow_mut().remove(qn).ok_or(Error::new(ErrorKind::DynamicAbsent, String::from("unable to find attribute")))?;
                                 let doc = self.owner_document();
                                 unattached(&doc, self.clone());
@@ -268,7 +281,8 @@ impl ItemNode for RNode {
                     None => return Err(Error::new(ErrorKind::Unknown, String::from("unable to find parent")))
                 }
             }
-            NodeInner::Element(parent, _, _, _) |
+            NodeInner::Element(parent, _, _, _, _) |
+            NodeInner::Namespace(parent, _) |
             NodeInner::Text(parent, _) |
             NodeInner::Comment(parent, _) |
             NodeInner::ProcessingInstruction(parent, _, _) => {
@@ -279,7 +293,7 @@ impl ItemNode for RNode {
                     return Err(Error::new(ErrorKind::Unknown, String::from("unable to access parent")))
                 };
                 match &p.0 {
-                    NodeInner::Element(_, _, _, c) => {
+                    NodeInner::Element(_, _, _, c,_) => {
                         let idx = find_index(&p, self)?;
                         c.borrow_mut().remove(idx);
                         let doc = self.owner_document();
@@ -296,7 +310,7 @@ impl ItemNode for RNode {
         if att.node_type() != NodeType::Attribute { return Err(Error::new(ErrorKind::TypeError, String::from("node is not an attribute")))}
 
         match &self.0 {
-            NodeInner::Element(_, _, patt, _) => {
+            NodeInner::Element(_, _, patt, _, _) => {
                 // Firstly, make sure the node is removed from its old parent
                 let mut m = att.clone();
                 m.pop()?;
@@ -314,6 +328,30 @@ impl ItemNode for RNode {
             _ => Err(Error::new(ErrorKind::TypeError, String::from("cannot add an attribute to this type of node"))),
         }
     }
+    fn add_namespace(&self, ns: Self) -> Result<(), Error>{
+        if ns.node_type() != NodeType::Namespace {
+            return Err(Error::new(ErrorKind::TypeError, String::from("node is not a namespace")))
+        }
+        match &self.0 {
+            NodeInner::Element(_,_,_,_, nsl)=> {
+                // Firstly, make sure the node is removed from its old parent
+                let mut m = ns.clone();
+                m.pop()?;
+                // Popping will put the node in the unattached list,
+                // so remove it from there
+                detach(ns.clone());
+                // Now add to this parent
+                // TODO: deal with same name being redefined
+                if let NodeInner::Namespace(_, _) = &ns.0 {
+                    let _ = nsl.borrow_mut().insert(0,ns.clone());
+                }
+                make_parent(ns, self.clone());
+                Ok(())
+            },
+            _ => Err(Error::new(ErrorKind::TypeError, String::from("cannot add an Namespace to this type of node")))
+        }
+    }
+
     fn insert_before(&mut self, n: Self) -> Result<(), Error> {
         if n.node_type() == NodeType::Document || n.node_type() == NodeType::Attribute { return Err(Error::new(ErrorKind::TypeError, String::from("cannot insert document or attribute node")))}
 
@@ -323,7 +361,7 @@ impl ItemNode for RNode {
         detach(n.clone());
         // Now insert into parent's child list
         match &self.0 {
-            NodeInner::Element(p, _, _, _) |
+            NodeInner::Element(p, _, _, _,_) |
             NodeInner::Text(p, _) |
             NodeInner::Comment(p, _) |
             NodeInner::ProcessingInstruction(p, _, _) => {
@@ -331,7 +369,7 @@ impl ItemNode for RNode {
                 let idx = find_index(&parent, self)?;
                 match &parent.0 {
                     NodeInner::Document(_, children, _) |
-                    NodeInner::Element(_, _, _, children) => {
+                    NodeInner::Element(_, _, _, children,_) => {
                         children.borrow_mut().insert(idx, n.clone());
                         make_parent(n, parent.clone())
                     }
@@ -346,8 +384,8 @@ impl ItemNode for RNode {
         // All new nodes are parentless, i.e. they are unattached to the tree
         match &self.0 {
             NodeInner::Document(x, _, _) => Ok(Rc::new(Node(NodeInner::Document(x.clone(), RefCell::new(vec![]), RefCell::new(vec![]))))),
-            NodeInner::Element(p, qn, _, _) => {
-                let new = Rc::new(Node(NodeInner::Element(p.clone(), qn.clone(), RefCell::new(HashMap::new()), RefCell::new(vec![]))));
+            NodeInner::Element(p, qn, _, _,_) => {
+                let new = Rc::new(Node(NodeInner::Element(p.clone(), qn.clone(), RefCell::new(HashMap::new()), RefCell::new(vec![]),RefCell::new(vec![]))));
                 unattached(self, new.clone());
                 Ok(new)
             },
@@ -367,6 +405,11 @@ impl ItemNode for RNode {
                 unattached(&self.parent().unwrap(), new.clone());
                 Ok(new)
             },
+            NodeInner::Namespace(p, qn) => {
+                let new = Rc::new(Node(NodeInner::Namespace(p.clone(), qn.clone())));
+                unattached(&self.parent().unwrap(), new.clone());
+                Ok(new)
+            }
         }
     }
     fn deep_copy(&self) -> Result<Self, Error> {
@@ -394,7 +437,8 @@ impl ItemNode for RNode {
                 Ok(self.new_text(w)?)
             }
             NodeInner::Attribute(_, _, _) => self.shallow_copy(),
-            NodeInner::Element(_, _, _, _) => {
+            NodeInner::Namespace(_,_) => self.shallow_copy(),
+            NodeInner::Element(_, _, _, _,_) => {
                 let mut result = self.shallow_copy()?;
 
                 self.attribute_iter().try_for_each(|a| {
@@ -435,11 +479,12 @@ impl Debug for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self.0 {
             NodeInner::Document(_, _, _) => write!(f, "document"),
-            NodeInner::Element(_, qn, _, _) => write!(f, "element-type node \"{}\"", qn.to_string()),
+            NodeInner::Element(_, qn, _, _,_) => write!(f, "element-type node \"{}\"", qn.to_string()),
             NodeInner::Attribute(_, qn, _) => write!(f, "attribute-type node \"{}\"", qn.to_string()),
             NodeInner::Text(_, v) => write!(f, "text-type node \"{}\"", v.to_string()),
             NodeInner::Comment(_, v) => write!(f, "comment-type node \"{}\"", v.to_string()),
             NodeInner::ProcessingInstruction(_, qn, _) => write!(f, "PI-type node \"{}\"", qn.to_string()),
+            NodeInner::Namespace(_, qn) => write!(f, "Namespace-type node \"{}\"", qn.to_string()),
         }
     }
 }
@@ -452,7 +497,7 @@ fn unattached(d: &RNode, n: RNode) {
             u.borrow_mut().push(n.clone());
             make_parent(n, d.clone())
         }
-        NodeInner::Element(_, _, _, _) => {
+        NodeInner::Element(_, _, _, _, _) => {
             let doc = d.owner_document();
             if let NodeInner::Document(_, _, u) = &doc.0 {
                 u.borrow_mut().push(n.clone());
@@ -467,10 +512,11 @@ fn unattached(d: &RNode, n: RNode) {
 // Make the parent of the node be the given new parent
 fn make_parent(n: RNode, b: RNode) {
     match &n.0 {
-        NodeInner::Element(p, _, _, _) |
+        NodeInner::Element(p, _, _, _,_) |
         NodeInner::Attribute(p, _, _) |
         NodeInner::Text(p, _) |
         NodeInner::Comment(p, _) |
+        NodeInner::Namespace(p, _) |
         NodeInner::ProcessingInstruction(p, _, _) => {
             *p.borrow_mut() = Rc::downgrade(&b)
         }
@@ -481,10 +527,11 @@ fn make_parent(n: RNode, b: RNode) {
 // This is in preparation for it being added to the tree.
 fn detach(n: RNode) {
     match &n.0 {
-        NodeInner::Element(p, _, _, _) |
+        NodeInner::Element(p, _, _,_, _) |
         NodeInner::Attribute(p, _, _) |
         NodeInner::Text(p, _) |
         NodeInner::Comment(p, _) |
+        NodeInner::Namespace(p, _) |
         NodeInner::ProcessingInstruction(p, _, _) => {
             let doc = Weak::upgrade(&p.borrow()).unwrap();
             match &doc.0 {
@@ -512,7 +559,7 @@ fn push_node(parent: &RNode, child: RNode) -> Result<(), Error> {
         NodeInner::Document(_, c, _) => {
             c.borrow_mut().push(child.clone());
         }
-        NodeInner::Element(_, _, _, c) => {
+        NodeInner::Element(_, _, _, c,_) => {
             c.borrow_mut().push(child.clone());
         }
         _ => return Err(Error::new(ErrorKind::TypeError, String::from("unable to add child node"))),
@@ -530,9 +577,10 @@ fn doc_order(n: &RNode) -> Vec<usize> {
             a.push(2);
             a
         }
-        NodeInner::Element(p, _, _, _) |
+        NodeInner::Element(p, _, _, _,_) |
         NodeInner::Text(p, _) |
         NodeInner::Comment(p, _) |
+        NodeInner::Namespace(p, _) |
         NodeInner::ProcessingInstruction(p, _, _) => {
             match Weak::upgrade(&p.borrow()) {
                 Some(q) => {
@@ -551,7 +599,7 @@ fn doc_order(n: &RNode) -> Vec<usize> {
 fn find_index(parent: &RNode, child: &RNode) -> Result<usize, Error> {
     let idx = match &parent.0 {
         NodeInner::Document(_, c, _) |
-        NodeInner::Element(_, _, _, c) => {
+        NodeInner::Element(_, _, _, c,_) => {
             c.borrow().iter()
                 .enumerate()
                 .fold(None, |mut acc, (i, v)| {
@@ -589,7 +637,7 @@ fn to_xml_int(
                 result.push_str(to_xml_int(&c, od, ns.clone(), indent + 2).as_str());
                 result
             }),
-        NodeInner::Element(_, qn, _, _) => {
+        NodeInner::Element(_, qn, _, _,_) => {
             let mut result = String::from("<");
             result.push_str(qn.to_string().as_str());
 
@@ -710,7 +758,7 @@ impl Children {
     fn new(n: &RNode) -> Self {
         match &n.0 {
             NodeInner::Document(_, c, _) |
-            NodeInner::Element(_, _, _, c) => Children {
+            NodeInner::Element(_, _, _, c,_) => Children {
                 v: c.borrow().clone(),
                 i: 0,
             },
@@ -748,10 +796,11 @@ impl Iterator for Ancestors {
     fn next(&mut self) -> Option<RNode> {
         let parent = match &self.cur.0 {
             NodeInner::Document(_, _, _) => None,
-            NodeInner::Element(p, _, _, _) |
+            NodeInner::Element(p, _, _, _,_) |
             NodeInner::Attribute(p, _, _) |
             NodeInner::Text(p, _) |
             NodeInner::Comment(p, _) |
+            NodeInner::Namespace(p, _) |
             NodeInner::ProcessingInstruction(p, _, _) => {
                 Weak::upgrade(&p.borrow())
             }
@@ -831,7 +880,7 @@ impl Iterator for Siblings {
             } else {
                 self.1 + self.2 as usize
             };
-            if let NodeInner::Element(_, _, _, children) = &self.0.0 {
+            if let NodeInner::Element(_, _, _, children,_) = &self.0.0 {
                 match children.borrow().get(newidx) {
                     Some(n) => {
                         self.1 = newidx;
@@ -851,7 +900,7 @@ pub struct Attributes {
 }
 impl Attributes {
     fn new(n: &RNode) -> Self {
-        if let NodeInner::Element(_, _, attributes, _) = &n.0 {
+        if let NodeInner::Element(_, _, attributes, _,_) = &n.0 {
             let b = attributes.borrow();
             Attributes {
                 it: Some(b.clone().into_iter()),

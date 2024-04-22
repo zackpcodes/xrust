@@ -116,6 +116,14 @@ impl Node for Nullo {
     fn set_xmldecl(&mut self, _: XMLDecl) -> Result<(), Error> {
         Err(Error::new(ErrorKind::NotImplemented, String::from("not implemented")))
     }
+
+    fn new_namespace(&self, prefix: String, uri: String) -> Result<Self, Error> {
+        Err(Error::new(ErrorKind::NotImplemented, String::from("not implemented")))
+    }
+
+    fn add_namespace(&self, ns: Self) -> Result<(), Error> {
+        Err(Error::new(ErrorKind::NotImplemented, String::from("not implemented")))
+    }
 }
 
 pub struct NulloIter();
