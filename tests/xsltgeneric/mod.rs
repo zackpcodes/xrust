@@ -1,27 +1,24 @@
 //! Tests for XSLT defined generically
 
 use pkg_version::{pkg_version_major, pkg_version_minor, pkg_version_patch};
-use std::collections::HashMap;
 use url::Url;
 use xrust::item::{Item, Node, Sequence, SequenceTrait};
 use xrust::transform::context::StaticContextBuilder;
 use xrust::xdmerror::{Error, ErrorKind};
 use xrust::xslt::from_document;
 
-fn test_rig<N: Node, G, H, J>(
+fn test_rig<N: Node, G, H>(
     src: impl AsRef<str>,
     style: impl AsRef<str>,
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<Sequence<N>, Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let srcdoc = parse_from_str(src.as_ref())?;
-    let (styledoc, stylens) = parse_from_str_with_ns(style.as_ref())?;
+    let styledoc = parse_from_str(style.as_ref())?;
     let mut stctxt = StaticContextBuilder::new()
         .message(|_| Ok(()))
         .fetcher(|_| Err(Error::new(ErrorKind::NotImplemented, "not implemented")))
@@ -29,7 +26,6 @@ where
         .build();
     let mut ctxt = from_document(
         styledoc,
-        stylens,
         None,
         |s| parse_from_str(s),
         |_| Ok(String::new()),
@@ -40,20 +36,18 @@ where
     ctxt.evaluate(&mut stctxt)
 }
 
-fn test_msg_rig<N: Node, G, H, J>(
+fn test_msg_rig<N: Node, G, H>(
     src: impl AsRef<str>,
     style: impl AsRef<str>,
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(Sequence<N>, Vec<String>), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let srcdoc = parse_from_str(src.as_ref())?;
-    let (styledoc, stylens) = parse_from_str_with_ns(style.as_ref())?;
+    let styledoc = parse_from_str(style.as_ref())?;
     let mut msgs: Vec<String> = vec![];
     let mut stctxt = StaticContextBuilder::new()
         .message(|m| {
@@ -65,7 +59,6 @@ where
         .build();
     let mut ctxt = from_document(
         styledoc,
-        stylens,
         None,
         |s| parse_from_str(s),
         |_| Ok(String::new()),
@@ -76,15 +69,13 @@ where
     Ok((seq, msgs))
 }
 
-pub fn generic_literal_text<N: Node, G, H, J>(
+pub fn generic_literal_text<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><Level1>one</Level1><Level1>two</Level1></Test>",
@@ -92,7 +83,6 @@ where
   <xsl:template match='/'>Found the document</xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_string() == "Found the document" {
@@ -108,15 +98,13 @@ where
     }
 }
 
-pub fn generic_sys_prop<N: Node, G, H, J>(
+pub fn generic_sys_prop<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><Level1>one</Level1><Level1>two</Level1></Test>",
@@ -124,7 +112,6 @@ where
   <xsl:template match='/'><xsl:sequence select='system-property("xsl:version")'/>-<xsl:sequence select='system-property("xsl:product-version")'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_string()
@@ -153,15 +140,13 @@ where
     }
 }
 
-pub fn generic_value_of_1<N: Node, G, H, J>(
+pub fn generic_value_of_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test>special &lt; less than</Test>",
@@ -169,7 +154,6 @@ where
   <xsl:template match='child::*'><xsl:value-of select='.'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_string() == "special &lt; less than" {
@@ -185,15 +169,13 @@ where
     }
 }
 
-pub fn generic_value_of_2<N: Node, G, H, J>(
+pub fn generic_value_of_2<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test>special &lt; less than</Test>",
@@ -201,7 +183,6 @@ where
   <xsl:template match='child::*'><xsl:value-of select='.' disable-output-escaping='yes'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_string() == "special < less than" {
@@ -217,15 +198,13 @@ where
     }
 }
 
-pub fn generic_literal_element<N: Node, G, H, J>(
+pub fn generic_literal_element<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><Level1>one</Level1><Level1>two</Level1></Test>",
@@ -233,7 +212,6 @@ where
   <xsl:template match='/'><answer>Made an element</answer></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "<answer>Made an element</answer>" {
@@ -249,15 +227,13 @@ where
     }
 }
 
-pub fn generic_element<N: Node, G, H, J>(
+pub fn generic_element<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><Level1>one</Level1><Level1>two</Level1></Test>",
@@ -265,7 +241,6 @@ where
   <xsl:template match='/'><xsl:element name='answer{count(ancestor::*)}'>Made an element</xsl:element></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "<answer0>Made an element</answer0>" {
@@ -281,15 +256,13 @@ where
     }
 }
 
-pub fn generic_apply_templates_1<N: Node, G, H, J>(
+pub fn generic_apply_templates_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><Level1>one</Level1><Level1>two</Level1></Test>",
@@ -299,7 +272,6 @@ where
   <xsl:template match='child::text()'>found text</xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "found textfound text" {
@@ -315,15 +287,13 @@ where
     }
 }
 
-pub fn generic_apply_templates_2<N: Node, G, H, J>(
+pub fn generic_apply_templates_2<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test>one<Level1/>two<Level1/>three<Level1/>four<Level1/></Test>",
@@ -334,7 +304,6 @@ where
   <xsl:template match='child::text()'><xsl:sequence select='.'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "onetwothreefour" {
@@ -350,15 +319,13 @@ where
     }
 }
 
-pub fn generic_apply_templates_mode<N: Node, G, H, J>(
+pub fn generic_apply_templates_mode<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test>one<Level1>a</Level1>two<Level1>b</Level1>three<Level1>c</Level1>four<Level1>d</Level1></Test>",
@@ -370,7 +337,6 @@ where
   <xsl:template match='child::Level1'>should not see this</xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "<HEAD><h1>a</h1><h1>b</h1><h1>c</h1><h1>d</h1></HEAD><BODY><p>a</p><p>b</p><p>c</p><p>d</p></BODY>" {
@@ -386,15 +352,13 @@ where
     }
 }
 
-pub fn generic_apply_templates_sort<N: Node, G, H, J>(
+pub fn generic_apply_templates_sort<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test>one<Level1>a</Level1>two<Level1>b</Level1>three<Level1>c</Level1>four<Level1>d</Level1></Test>",
@@ -405,7 +369,6 @@ where
   <xsl:template match='child::Test/child::text()'><p><xsl:sequence select='.'/></p></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml()
@@ -423,15 +386,13 @@ where
     }
 }
 
-pub fn generic_comment<N: Node, G, H, J>(
+pub fn generic_comment<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test>one<Level1/>two<Level1/>three<Level1/>four<Level1/></Test>",
@@ -442,7 +403,6 @@ where
   <xsl:template match='child::text()'><xsl:sequence select='.'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "one<!-- this is a level 1 element -->two<!-- this is a level 1 element -->three<!-- this is a level 1 element -->four<!-- this is a level 1 element -->" {
@@ -453,15 +413,13 @@ where
     }
 }
 
-pub fn generic_pi<N: Node, G, H, J>(
+pub fn generic_pi<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test>one<Level1/>two<Level1/>three<Level1/>four<Level1/></Test>",
@@ -472,7 +430,6 @@ where
   <xsl:template match='child::text()'><xsl:sequence select='.'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "one<?piL1 this is a level 1 element?>two<?piL1 this is a level 1 element?>three<?piL1 this is a level 1 element?>four<?piL1 this is a level 1 element?>" {
@@ -483,15 +440,13 @@ where
     }
 }
 
-pub fn generic_current<N: Node, G, H, J>(
+pub fn generic_current<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test ref='one'><second name='foo'>I am foo</second><second name='one'>I am one</second></Test>",
@@ -501,7 +456,6 @@ where
   </xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "<second name='one'>I am one</second>" {
@@ -517,15 +471,13 @@ where
     }
 }
 
-pub fn generic_key_1<N: Node, G, H, J>(
+pub fn generic_key_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><one>blue</one><two>yellow</two><three>green</three><four>blue</four></Test>",
@@ -537,7 +489,6 @@ where
   <xsl:template match='child::text()'><xsl:sequence select='.'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "#blue = 2" {
@@ -555,15 +506,13 @@ where
 
 // Although we have the source and stylesheet in files,
 // they are inlined here to avoid dependency on I/O libraries
-pub fn generic_issue_58<N: Node, G, H, J>(
+pub fn generic_issue_58<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         r#"<Example>
@@ -597,7 +546,6 @@ where
 </xsl:stylesheet>
 "#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml()
@@ -614,15 +562,13 @@ where
     }
 }
 
-pub fn generic_message_1<N: Node, G, H, J>(
+pub fn generic_message_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let (result, msgs) = test_msg_rig(
         "<Test>one<Level1/>two<Level1/>three<Level1/>four<Level1/></Test>",
@@ -633,7 +579,6 @@ where
   <xsl:template match='child::text()'><xsl:sequence select='.'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_xml() == "one<L></L>two<L></L>three<L></L>four<L></L>" {
@@ -666,15 +611,13 @@ where
     }
 }
 
-pub fn generic_message_term<N: Node, G, H, J>(
+pub fn generic_message_term<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     match test_msg_rig(
         "<Test>one<Level1/>two<Level1/>three<Level1/>four<Level1/></Test>",
@@ -685,7 +628,6 @@ where
   <xsl:template match='child::text()'><xsl:sequence select='.'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     ) {
         Err(e) => {
@@ -704,15 +646,13 @@ where
         )),
     }
 }
-pub fn generic_callable_named_1<N: Node, G, H, J>(
+pub fn generic_callable_named_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><one>blue</one><two>yellow</two><three>green</three><four>blue</four></Test>",
@@ -731,7 +671,6 @@ where
   </xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_string() == "There are 4 child elements" {
@@ -746,15 +685,13 @@ where
         ))
     }
 }
-pub fn generic_callable_posn_1<N: Node, G, H, J>(
+pub fn generic_callable_posn_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><one>blue</one><two>yellow</two><three>green</three><four>blue</four></Test>",
@@ -771,7 +708,6 @@ where
   </xsl:function>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     if result.to_string() == "There are 4 child elements" {
@@ -787,19 +723,17 @@ where
     }
 }
 
-pub fn generic_include<N: Node, G, H, J>(
+pub fn generic_include<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let srcdoc =
         parse_from_str("<Test>one<Level1/>two<Level2/>three<Level3/>four<Level4/></Test>")?;
-    let (styledoc, stylens) = parse_from_str_with_ns(
+    let styledoc = parse_from_str(
         "<xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform'>
   <xsl:include href='included.xsl'/>
   <xsl:template match='child::Test'><xsl:apply-templates/></xsl:template>
@@ -819,7 +753,6 @@ where
         .build();
     let mut ctxt = from_document(
         styledoc,
-        stylens,
         Some(
             Url::parse(format!("file://{}/tests/xsl/including.xsl", pwds.as_str()).as_str())
                 .expect("unable to parse URL"),
@@ -839,18 +772,16 @@ where
     }
 }
 
-pub fn generic_document_1<N: Node, G, H, J>(
+pub fn generic_document_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let srcdoc = parse_from_str("<Test><internal>on the inside</internal></Test>")?;
-    let (styledoc, stylens) = parse_from_str_with_ns(
+    let styledoc= parse_from_str(
         r##"<xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform'>
   <xsl:template match='child::Test'><xsl:apply-templates/>|<xsl:apply-templates select='document("urn::test.org/test")'/></xsl:template>
   <xsl:template match='child::internal'>found internal element</xsl:template>
@@ -869,7 +800,6 @@ where
         .build();
     let mut ctxt = from_document(
         styledoc,
-        stylens,
         None,
         |s| parse_from_str(s),
         |_| Ok(String::new()),
@@ -884,18 +814,16 @@ where
     }
 }
 
-pub fn generic_number_1<N: Node, G, H, J>(
+pub fn generic_number_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let srcdoc = parse_from_str("<Test><t>one</t><t>two</t><t>three</t></Test>")?;
-    let (styledoc, stylens) = parse_from_str_with_ns(
+    let styledoc= parse_from_str(
         r##"<xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform'>
   <xsl:template match='child::Test'><xsl:apply-templates/></xsl:template>
   <xsl:template match='child::t'>t element <xsl:number/></xsl:template>
@@ -909,7 +837,6 @@ where
         .build();
     let mut ctxt = from_document(
         styledoc,
-        stylens,
         None,
         |s| parse_from_str(s),
         |_| Ok(String::new()),
@@ -921,15 +848,13 @@ where
     Ok(())
 }
 
-pub fn attr_set_1<N: Node, G, H, J>(
+pub fn attr_set_1<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><Level1>one</Level1><Level1>two</Level1></Test>",
@@ -940,7 +865,6 @@ where
   <xsl:template match='child::Level1'><xsl:copy xsl:use-attribute-sets='foo'/></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     assert_eq!(
@@ -950,15 +874,13 @@ where
     Ok(())
 }
 
-pub fn attr_set_2<N: Node, G, H, J>(
+pub fn attr_set_2<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><Level1>one</Level1><Level1>two</Level1></Test>",
@@ -969,22 +891,19 @@ where
   <xsl:template match='child::Level1'><MyElement xsl:use-attribute-sets='foo'><xsl:apply-templates/></MyElement></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     assert_eq!(result.to_xml(), "<MyElement bar='from set foo'>one</MyElement><MyElement bar='from set foo'>two</MyElement>");
     Ok(())
 }
 
-pub fn attr_set_3<N: Node, G, H, J>(
+pub fn attr_set_3<N: Node, G, H>(
     parse_from_str: G,
-    parse_from_str_with_ns: J,
     make_doc: H,
 ) -> Result<(), Error>
 where
     G: Fn(&str) -> Result<N, Error>,
     H: Fn() -> Result<N, Error>,
-    J: Fn(&str) -> Result<(N, Vec<HashMap<Option<String>, String>>), Error>,
 {
     let result = test_rig(
         "<Test><Level1>one</Level1><Level1>two</Level1></Test>",
@@ -995,7 +914,6 @@ where
   <xsl:template match='child::Level1'><xsl:element name='Element' xsl:use-attribute-sets='foo'><xsl:apply-templates/></xsl:element></xsl:template>
 </xsl:stylesheet>"#,
         parse_from_str,
-        parse_from_str_with_ns,
         make_doc,
     )?;
     assert_eq!(

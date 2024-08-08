@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
-use std::ops::ControlFlow;
+use crate::{item, Node};
 
 #[derive(Clone)]
 pub struct QualifiedName {
@@ -172,6 +172,79 @@ impl TryFrom<&str> for QualifiedName {
     }
 }
 
+/*
+impl TryFrom<(&str, Node::NodeIterator)> for QualifiedName {
+    type Error = Error;
+    fn try_from<T: Node::NodeIterator>(s: (&str, T)) -> Result<Self, Self::Error> {
+        let state: ParserState<Nullo> = ParserState::new(None, None);
+        match eqname()((s.0, state)) {
+            Ok((_, qn)) => {
+                if qn.get_prefix().is_some() && qn.get_nsuri_ref().is_none() {
+
+                    //s.1 is namespaces at the node
+                    for n in s.1 {
+                        if n.name().get_localname() == qn.get_prefix().unwrap(){
+                            return Ok(QualifiedName::new(
+                                n.name().get_nsuri(),
+                                Some(qn.get_prefix().unwrap()),
+                                qn.get_localname(),
+                            ))
+                        }
+                    }
+                    Err(Error::new(
+                        ErrorKind::ParseError,
+                        String::from("unable to parse qualified name - Missing Namespace"),
+                    ))
+
+                } else {
+                    Ok(qn)
+                }
+            }
+            Err(_) => Err(Error::new(
+                ErrorKind::ParseError,
+                String::from("unable to parse qualified name"),
+            )),
+        }
+    }
+}
+ */
+
+impl<N: item::Node> TryFrom<(&str, Vec<N>)> for QualifiedName {
+    type Error = Error;
+    fn try_from(s: (&str, Vec<N>)) -> Result<Self, Self::Error> {
+        let state: ParserState<Nullo> = ParserState::new(None, None);
+        match eqname()((s.0, state)) {
+            Ok((_, qn)) => {
+                if qn.get_prefix().is_some() && qn.get_nsuri_ref().is_none() {
+
+                    //s.1 is namespaces at the node
+                    for n in s.1 {
+                        if n.name().get_localname() == qn.get_prefix().unwrap(){
+                            return Ok(QualifiedName::new(
+                                n.name().get_nsuri(),
+                                Some(qn.get_prefix().unwrap()),
+                                qn.get_localname(),
+                            ))
+                        }
+                    }
+                    Err(Error::new(
+                        ErrorKind::ParseError,
+                        String::from("unable to parse qualified name - Missing Namespace"),
+                    ))
+
+                } else {
+                    Ok(qn)
+                }
+            }
+            Err(_) => Err(Error::new(
+                ErrorKind::ParseError,
+                String::from("unable to parse qualified name"),
+            )),
+        }
+    }
+}
+
+/*
 /// Parse a string to create a [QualifiedName].
 /// Resolve prefix against a set of XML Namespace declarations
 /// QualifiedName ::= (prefix ":")? local-name
@@ -207,6 +280,7 @@ impl TryFrom<(&str, &Vec<HashMap<Option<String>, String>>)> for QualifiedName {
         }
     }
 }
+ */
 
 #[cfg(test)]
 mod tests {

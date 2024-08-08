@@ -1,10 +1,9 @@
 // Support functions for smite tests
 
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use xrust::item::{Item, Node};
-use xrust::parser::xml::{parse as xmlparse, parse_with_ns};
+use xrust::parser::xml::{parse as xmlparse};
 use xrust::qname::QualifiedName;
 use xrust::trees::smite::{Node as SmiteNode, RNode};
 use xrust::value::Value;
@@ -52,13 +51,4 @@ pub fn make_from_str(s: &str) -> Result<RNode, Error> {
     let doc = Rc::new(SmiteNode::new());
     xmlparse(doc.clone(), s, None)?;
     Ok(doc)
-}
-
-#[allow(dead_code)]
-pub fn make_from_str_with_ns(
-    s: &str,
-) -> Result<(RNode, Vec<HashMap<Option<String>, String>>), Error> {
-    let doc = Rc::new(SmiteNode::new());
-    let r = parse_with_ns(doc.clone(), s, None)?;
-    Ok(r)
 }
