@@ -52,8 +52,10 @@ use crate::xmldecl::{XMLDecl, XMLDeclBuilder};
 use regex::Regex;
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::collections::hash_map::IntoIter;
+use std::collections::btree_map::IntoIter;
+//use std::collections::hash_map::IntoIter;
 use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::rc::{Rc, Weak};
@@ -70,7 +72,7 @@ enum NodeInner {
     Element(
         RefCell<Weak<Node>>, // Parent: must be a Document or an Element
         Rc<QualifiedName>,   // name
-        RefCell<HashMap<Rc<QualifiedName>, RNode>>, // attributes
+        RefCell<BTreeMap<Rc<QualifiedName>, RNode>>, // attributes
         RefCell<Vec<RNode>>, // children
         RefCell<HashMap<Option<String>, RNode>>, // namespaces
     ),
@@ -339,7 +341,7 @@ impl ItemNode for RNode {
         let child = Rc::new(Node(NodeInner::Element(
             RefCell::new(Rc::downgrade(&self.owner_document())),
             Rc::new(qn),
-            RefCell::new(HashMap::new()),
+            RefCell::new(BTreeMap::new()),
             RefCell::new(vec![]),
             RefCell::new(HashMap::new()),
         )));
@@ -630,7 +632,7 @@ impl ItemNode for RNode {
                 let new = Rc::new(Node(NodeInner::Element(
                     p.clone(),
                     qn.clone(),
-                    RefCell::new(HashMap::new()),
+                    RefCell::new(BTreeMap::new()),
                     RefCell::new(vec![]),
                     RefCell::new(HashMap::new()),
                 )));
@@ -809,7 +811,7 @@ impl Debug for Node {
     }
 }
 
-fn format_attrs(ats: &HashMap<Rc<QualifiedName>, RNode>) -> String {
+fn format_attrs(ats: &BTreeMap<Rc<QualifiedName>, RNode>) -> String {
     let mut result = String::new();
     ats.iter()
         .for_each(|(k, v)| result.push_str(format!(" {}='{}'", k, v.to_string()).as_str()));
