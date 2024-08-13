@@ -54,7 +54,7 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::btree_map::IntoIter;
 //use std::collections::hash_map::IntoIter;
-use std::collections::HashMap;
+//use std::collections::HashMap;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -74,7 +74,7 @@ enum NodeInner {
         Rc<QualifiedName>,   // name
         RefCell<BTreeMap<Rc<QualifiedName>, RNode>>, // attributes
         RefCell<Vec<RNode>>, // children
-        RefCell<HashMap<Option<String>, RNode>>, // namespaces
+        RefCell<BTreeMap<Option<String>, RNode>>, // namespaces
     ),
     Text(RefCell<Weak<Node>>, Rc<Value>),
     Attribute(RefCell<Weak<Node>>, Rc<QualifiedName>, Rc<Value>),
@@ -343,7 +343,7 @@ impl ItemNode for RNode {
             Rc::new(qn),
             RefCell::new(BTreeMap::new()),
             RefCell::new(vec![]),
-            RefCell::new(HashMap::new()),
+            RefCell::new(BTreeMap::new()),
         )));
         unattached(self, child.clone());
         Ok(child)
@@ -634,7 +634,7 @@ impl ItemNode for RNode {
                     qn.clone(),
                     RefCell::new(BTreeMap::new()),
                     RefCell::new(vec![]),
-                    RefCell::new(HashMap::new()),
+                    RefCell::new(BTreeMap::new()),
                 )));
                 unattached(self, new.clone());
                 Ok(new)
@@ -1271,7 +1271,7 @@ impl NamespaceNodes {
             let xns = n.new_namespace("http://www.w3.org/XML/1998/namespace".to_string(),Some("xml".to_string()))
                 .expect("Unable to generate xml namespace");
 
-            let mut nshm = HashMap::new();
+            let mut nshm = BTreeMap::new();
             nshm.insert(Some("xml".to_string()), xns);
 
 

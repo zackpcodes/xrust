@@ -15,16 +15,20 @@ fn serializer_issue_98() {
     */
 
     let data = fs::read_to_string("tests/xml/issue-98.xml").unwrap();
-    let source = Rc::new(SmiteNode::new());
-    let parseresult = xml::parse(source.clone(), &data, None);
-    let out1 = parseresult.unwrap().to_xml();
+    let mut prev_xml_output = None;
 
-    let source2 = Rc::new(SmiteNode::new());
-    let parseresult2 = xml::parse(source2.clone(), &data, None);
-    let out2 = parseresult2.unwrap().to_xml();
+    for iteration in 0..100 {
+        let doc = xml::parse(Rc::new(SmiteNode::new()), data.clone().as_str(), None).unwrap();
+        let xml_output = doc.to_xml();
 
-    //println!("{:?}", out1);
-    //println!("{:?}", out2);
-    assert_eq!(out1, out2)
+        if let Some(prev_xml_output) = &prev_xml_output {
+            assert_eq!(
+                &xml_output,
+                prev_xml_output,
+                "Failed on run {}", iteration
+            );
+        }
+        prev_xml_output = Some(xml_output);
+    }
 
 }
