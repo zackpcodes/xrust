@@ -988,15 +988,7 @@ fn to_xml_int(
                     declared.push(m.clone())
                 })
             });
-            // Finally, it's child elements
-            node.child_iter()
-                .filter(|c| c.node_type() == NodeType::Element)
-                .for_each(|c| {
-                    namespace_check(&c.name(), &declared).iter().for_each(|m| {
-                        newns.push(m.clone());
-                        declared.push(m.clone())
-                    })
-                });
+
             newns.iter().for_each(|(u, p)| {
                 result.push_str(" xmlns");
                 if let Some(q) = p {
@@ -1010,7 +1002,7 @@ fn to_xml_int(
 
             node.attribute_iter().for_each(|a| {
                 result.push_str(
-                    format!(" {}='{}'", a.name().to_string().as_str(), a.value()).as_str(),
+                    format!(" {}='{}'", a.name().to_string().as_str(), a.to_string()).as_str(),
                 )
             });
             result.push('>');
