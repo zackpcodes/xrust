@@ -478,7 +478,7 @@ pub(crate) fn function_call<'a, N: Node + 'a>(
                 _ => Transform::Error(
                     ErrorKind::ParseError,
                     format!("undefined function \"{}\"", qn),
-                ), // TODO: user-defined functions
+                ),
             },
             NodeTest::Name(NameTest {
                 name: Some(WildcardOrName::Name(localpart)),

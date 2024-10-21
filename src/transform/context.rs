@@ -38,6 +38,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use url::Url;
 
+use super::callable::ActualParameters;
+
 //pub type Message = FnMut(&str) -> Result<(), Error>;
 
 /// The transformation context. This is the dynamic context.
@@ -71,6 +73,7 @@ pub struct Context<N: Node> {
     // Output control
     pub(crate) od: OutputDefinition,
     pub(crate) base_url: Option<Url>,
+    pub(crate) ext_functions: HashMap<QualifiedName, fn(arguments: &ActualParameters<N>) -> Result<Sequence<N>, Error>>,
     // Namespace resolution. If any transforms contain a QName that needs to be resolved to an EQName,
     // then these prefix -> URI mappings are used. These are usually derived from the stylesheet document.
     //pub(crate) namespaces: Vec<HashMap<Option<String>, String>>,
@@ -94,6 +97,7 @@ impl<N: Node> Context<N> {
             key_values: HashMap::new(),
             od: OutputDefinition::new(),
             base_url: None,
+            ext_functions: HashMap::new(),
         }
     }
     /// Sets the context item.
@@ -184,6 +188,10 @@ impl<N: Node> Context<N> {
     #[allow(dead_code)]
     fn set_baseurl(&mut self, url: Url) {
         self.base_url = Some(url);
+    }
+
+    pub fn register_ext_function(&mut self, qn: QualifiedName, func: fn(arguments: &ActualParameters<N>) -> Result<Sequence<N>, Error>) {
+        self.ext_functions.insert(qn, func);
     }
 
     /// Evaluate finds a template matching the current item and evaluates the body of the template,
@@ -470,6 +478,7 @@ impl<N: Node> From<Sequence<N>> for Context<N> {
             current_group: Sequence::new(),
             od: OutputDefinition::new(),
             base_url: None,
+            ext_functions: HashMap::new(),
         }
     }
 }

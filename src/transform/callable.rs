@@ -110,9 +110,12 @@ pub(crate) fn invoke<
                 }
             }
         }
-        None => Err(Error::new(
-            ErrorKind::Unknown,
-            format!("unknown callable \"{}\"", qn),
-        )),
+        None => match ctxt.ext_functions.get(&qnr) {
+            Some(f) => f(a),
+            None => Err(Error::new(
+                ErrorKind::Unknown,
+                format!("unknown callable \"{}\"", qn),
+            )),
+        }
     }
 }
